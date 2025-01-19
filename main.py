@@ -1,12 +1,13 @@
 import pickle
 import os
-import sys  # Added sys import
+import sys
 from typing import List, Literal
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, validator
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 from fastapi.middleware.cors import CORSMiddleware
+import joblib  # Add this import
 
 # Initialize FastAPI
 app = FastAPI(
@@ -23,21 +24,38 @@ scaler = None
 def load_models():
     global model, scaler
     try:
-        # List directory contents for debugging
         print("Current working directory:", os.getcwd())
         print("Directory contents:", os.listdir())
         
-        # Load model
-        print("Attempting to load model...")
-        with open("model.pkl", "rb") as file:
-            model = pickle.load(file)
-        print("Model loaded successfully")
-        
-        # Load scaler
-        print("Attempting to load scaler...")
-        with open("scaler.pkl", "rb") as file:
-            scaler = pickle.load(file)
-        print("Scaler loaded successfully")
+        # Try different loading methods
+        try:
+            print("Attempting to load model with pickle...")
+            with open("model.pkl", "rb") as file:
+                model = pickle.load(file)
+        except Exception as e1:
+            print(f"Pickle load failed: {str(e1)}")
+            print("Attempting to load model with joblib...")
+            try:
+                model = joblib.load("model.pkl")
+            except Exception as e2:
+                print(f"Joblib load failed: {str(e2)}")
+                raise Exception("Could not load model with either method")
+
+        try:
+            print("Attempting to load scaler with pickle...")
+            with open("scaler.pkl", "rb") as file:
+                scaler = pickle.load(file)
+        except Exception as e1:
+            print(f"Pickle load failed: {str(e1)}")
+            print("Attempting to load scaler with joblib...")
+            try:
+                scaler = joblib.load("scaler.pkl")
+            except Exception as e2:
+                print(f"Joblib load failed: {str(e2)}")
+                raise Exception("Could not load scaler with either method")
+
+        print("Model and scaler loaded successfully")
+        return True
             
     except Exception as e:
         print(f"Error loading models: {str(e)}")
@@ -46,18 +64,17 @@ def load_models():
             print("Model failed to load")
         if scaler is None:
             print("Scaler failed to load")
-        raise Exception(f"Error loading models: {str(e)}")
+        return False
 
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Update this with your frontend URL in production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Define input schema
 class FraudInput(BaseModel):
     step: int = 1
     type: Literal["PAYMENT", "CASH_IN", "DEBIT", "CASH_OUT", "TRANSFER"]
@@ -74,7 +91,7 @@ class FraudInput(BaseModel):
         return v
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {  # Updated from schema_extra
             "example": {
                 "step": 1,
                 "type": "PAYMENT",
@@ -84,7 +101,6 @@ class FraudInput(BaseModel):
             }
         }
 
-# Define type mapping
 TYPE_MAPPING = {
     "PAYMENT": 0,
     "CASH_IN": 1,
@@ -93,7 +109,6 @@ TYPE_MAPPING = {
     "TRANSFER": 4
 }
 
-# Define the root route
 @app.get("/")
 async def read_root():
     return {
@@ -102,18 +117,18 @@ async def read_root():
         "health": "OK"
     }
 
-# Endpoint for prediction
 @app.post("/predict")
 async def predict(data: FraudInput):
     if model is None or scaler is None:
-        raise HTTPException(
-            status_code=500,
-            detail="Model or scaler not loaded. Please check server logs."
-        )
+        # Try loading models again
+        if not load_models():
+            raise HTTPException(
+                status_code=503,
+                detail="Model service not ready. Please try again later."
+            )
     
     try:
         print(f"Received prediction request for data: {data}")
-        # Convert input to model-ready format
         input_data = np.array([[
             data.step,
             TYPE_MAPPING[data.type],
@@ -123,12 +138,9 @@ async def predict(data: FraudInput):
         ]])
         
         print(f"Transformed input data shape: {input_data.shape}")
-        
-        # Transform using pre-fitted scaler
         input_scaled = scaler.transform(input_data)
         print(f"Scaled input data shape: {input_scaled.shape}")
         
-        # Make prediction
         prediction = model.predict(input_scaled)
         print(f"Prediction result: {prediction[0]}")
         
@@ -144,7 +156,6 @@ async def predict(data: FraudInput):
             detail=f"Prediction error: {str(e)}"
         )
 
-# Health check endpoint
 @app.get("/health")
 async def health_check():
     model_status = "loaded" if model is not None else "not loaded"
@@ -154,10 +165,11 @@ async def health_check():
         "model_status": model_status,
         "scaler_status": scaler_status,
         "current_directory": os.getcwd(),
-        "directory_contents": os.listdir()
+        "directory_contents": os.listdir(),
+        "python_version": sys.version
     }
 
-# Load models when the application starts
+# Try to load models on startup, but don't fail if they don't load
 load_models()
 
 if __name__ == "__main__":
