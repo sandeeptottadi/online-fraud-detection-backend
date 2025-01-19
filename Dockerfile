@@ -1,18 +1,23 @@
 FROM python:3.9-slim
 
-WORKDIR /
+WORKDIR /app
 
-# Install system dependencies including gcc
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy everything to root
-COPY . .
-
-# Install Python packages
+# Copy only necessary files
+COPY requirements.txt .
 RUN pip install -r requirements.txt
+
+# Copy application files
+COPY model.pkl .
+COPY scaler.pkl .
+
+# Verify files are copied
+RUN ls -la
 
 # Set environment variables
 ENV PORT=8000

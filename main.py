@@ -18,15 +18,20 @@ app = FastAPI(
 model = None
 scaler = None
 
-# Load the model and scaler
+# Load models on startup
 def load_models():
     global model, scaler
     try:
-        model_path = os.path.join(os.path.dirname(__file__), "model.pkl")
-        scaler_path = os.path.join(os.path.dirname(__file__), "scaler.pkl")
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        model_path = os.path.join(current_dir, "model.pkl")
+        scaler_path = os.path.join(current_dir, "scaler.pkl")
         
+        print(f"Current directory: {current_dir}")
         print(f"Attempting to load model from: {model_path}")
         print(f"Attempting to load scaler from: {scaler_path}")
+        
+        # List directory contents for debugging
+        print("Directory contents:", os.listdir(current_dir))
         
         with open(model_path, "rb") as file:
             model = pickle.load(file)
@@ -36,15 +41,10 @@ def load_models():
             scaler = pickle.load(file)
         print("Scaler loaded successfully")
             
-    except FileNotFoundError as e:
-        print(f"File not found error: {str(e)}")
-        raise Exception("Model or scaler file not found")
-    except pickle.UnpicklingError as e:
-        print(f"Error unpickling model/scaler: {str(e)}")
-        raise Exception("Error loading model or scaler")
     except Exception as e:
-        print(f"Unexpected error loading model/scaler: {str(e)}")
-        raise Exception(f"Unexpected error: {str(e)}")
+        print(f"Error loading models: {str(e)}")
+        print(f"Python version: {sys.version}")
+        raise Exception(f"Error loading models: {str(e)}")
 
 # Load models on startup
 load_models()
