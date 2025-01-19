@@ -50,11 +50,15 @@ def generate_transaction():
     }
 
 def main():
-    # Generate dataset
-    n_samples = 10000
+    # Generate dataset with more fraudulent cases
+    n_samples = 20000  # Increase sample size
     print("Generating transactions...")
     transactions = [generate_transaction() for _ in range(n_samples)]
     df = pd.DataFrame(transactions)
+    
+    # Print class distribution
+    print("\nClass distribution:")
+    print(df['isFraud'].value_counts(normalize=True))
     
     # Prepare features
     X = df[['step', 'type', 'amount', 'oldbalanceOrg', 'oldbalanceDest']]
@@ -64,40 +68,69 @@ def main():
     X['type'] = X['type'].map(TYPE_MAPPING)
     
     # Initialize and fit scaler
-    print("Fitting scaler...")
+    print("\nFitting scaler...")
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
     
-    # Train model
+    # Train model with better parameters
     print("Training model...")
     model = RandomForestClassifier(
-        n_estimators=100,
-        max_depth=10,
+        n_estimators=200,  # Increased from 100
+        max_depth=15,      # Increased from 10
         min_samples_split=5,
         min_samples_leaf=2,
         random_state=42,
-        class_weight='balanced'
+        class_weight='balanced',
+        n_jobs=-1  # Use all CPU cores
     )
     model.fit(X_scaled, y)
     
-    # Save with specific protocol version
-    print("Saving model and scaler...")
-    with open('model.pkl', 'wb') as f:
-        pickle.dump(model, f, protocol=4)
+    # Test model performance
+    print("\nTesting model performance...")
+    y_pred = model.predict(X_scaled)
+    y_prob = model.predict_proba(X_scaled)
     
-    with open('scaler.pkl', 'wb') as f:
-        pickle.dump(scaler, f, protocol=4)
+    # Print some metrics
+    from sklearn.metrics import classification_report
+    print("\nModel Performance:")
+    print(classification_report(y, y_pred))
     
-    print("Testing saved models...")
-    # Verify the saved models can be loaded
-    with open('model.pkl', 'rb') as f:
-        test_model = pickle.load(f)
-    with open('scaler.pkl', 'rb') as f:
-        test_scaler = pickle.load(f)
+    # Save models
+    print("\nSaving models...")
+    joblib.dump(model, 'model.pkl')
+    joblib.dump(scaler, 'scaler.pkl')
     
-    print("Model and scaler saved and verified successfully!")
-    print(f"Model file size: {os.path.getsize('model.pkl')} bytes")
-    print(f"Scaler file size: {os.path.getsize('scaler.pkl')} bytes")
+    # Test predictions
+    print("\nTesting some cases...")
+    test_cases = [
+        {
+            'step': 210,
+            'type': "TRANSFER",
+            'amount': 100000.00,
+            'oldbalanceOrg': 0.00,
+            'oldbalanceDest': 0.00
+        },
+        {
+            'step': 1,
+            'type': "PAYMENT",
+            'amount': 500.00,
+            'oldbalanceOrg': 10000.00,
+            'oldbalanceDest': 10000.00
+        }
+    ]
+    
+    for case in test_cases:
+        input_data = np.array([[
+            case['step'],
+            TYPE_MAPPING[case['type']],
+            case['amount'],
+            case['oldbalanceOrg'],
+            case['oldbalanceDest']
+        ]])
+        input_scaled = scaler.transform(input_data)
+        prob = model.predict_proba(input_scaled)[0]
+        print(f"\nCase: {case}")
+        print(f"Fraud probability: {prob[1]:.2%}")
 
 if __name__ == "__main__":
     main()

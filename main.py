@@ -137,18 +137,53 @@ async def predict(data: FraudInput):
             data.oldbalanceDest
         ]])
         
-        print(f"Transformed input data shape: {input_data.shape}")
+        print(f"Input data before scaling: {input_data}")
         input_scaled = scaler.transform(input_data)
-        print(f"Scaled input data shape: {input_scaled.shape}")
+        print(f"Input data after scaling: {input_scaled}")
         
+        # Get both prediction and probability
         prediction = model.predict(input_scaled)
-        print(f"Prediction result: {prediction[0]}")
+        probability = model.predict_proba(input_scaled)
+        
+        print(f"Raw prediction: {prediction[0]}")
+        print(f"Prediction probabilities: {probability[0]}")
+        
+        is_fraud = bool(prediction[0])
+        fraud_probability = float(probability[0][1])  # Probability of fraud class
+        
+        # Determine message based on probability
+        if fraud_probability > 0.75:
+            message = "High risk of fraud detected!"
+            risk_level = "high"
+        elif fraud_probability > 0.5:
+            message = "Potential fraud detected - review recommended"
+            risk_level = "medium"
+        elif fraud_probability > 0.25:
+            message = "Low risk transaction - proceed with caution"
+            risk_level = "low"
+        else:
+            message = "Transaction appears legitimate"
+            risk_level = "safe"
         
         return {
-            "fraud_prediction": bool(prediction[0]),
-            "success": True,
-            "message": "Fraudulent transaction detected!" if prediction[0] else "Transaction appears legitimate"
+            "fraud_prediction": is_fraud,
+            "fraud_probability": fraud_probability,
+            "risk_level": risk_level,
+            "message": message,
+            "details": {
+                "input_features": {
+                    "step": data.step,
+                    "type": data.type,
+                    "amount": data.amount,
+                    "oldbalanceOrg": data.oldbalanceOrg,
+                    "oldbalanceDest": data.oldbalanceDest
+                },
+                "scaled_features": input_scaled.tolist(),
+                "raw_prediction": prediction.tolist(),
+                "probability_scores": probability.tolist()
+            }
         }
+        
     except Exception as e:
         print(f"Error during prediction: {str(e)}")
         raise HTTPException(
