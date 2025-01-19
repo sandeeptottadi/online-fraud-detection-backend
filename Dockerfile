@@ -8,14 +8,11 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install Python packages
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+# Copy everything to root
+COPY . .
 
-# Copy application files
-COPY main.py .
-COPY model.pkl .
-COPY scaler.pkl .
+# Install Python packages
+RUN pip install -r requirements.txt
 
 # Set environment variables
 ENV PORT=8000
