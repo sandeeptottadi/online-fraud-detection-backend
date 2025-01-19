@@ -1,5 +1,6 @@
 import pickle
 import os
+import sys  # Added sys import
 from typing import List, Literal
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, validator
@@ -22,32 +23,30 @@ scaler = None
 def load_models():
     global model, scaler
     try:
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        model_path = os.path.join(current_dir, "model.pkl")
-        scaler_path = os.path.join(current_dir, "scaler.pkl")
-        
-        print(f"Current directory: {current_dir}")
-        print(f"Attempting to load model from: {model_path}")
-        print(f"Attempting to load scaler from: {scaler_path}")
-        
         # List directory contents for debugging
-        print("Directory contents:", os.listdir(current_dir))
+        print("Current working directory:", os.getcwd())
+        print("Directory contents:", os.listdir())
         
-        with open(model_path, "rb") as file:
+        # Load model
+        print("Attempting to load model...")
+        with open("model.pkl", "rb") as file:
             model = pickle.load(file)
         print("Model loaded successfully")
         
-        with open(scaler_path, "rb") as file:
+        # Load scaler
+        print("Attempting to load scaler...")
+        with open("scaler.pkl", "rb") as file:
             scaler = pickle.load(file)
         print("Scaler loaded successfully")
             
     except Exception as e:
         print(f"Error loading models: {str(e)}")
         print(f"Python version: {sys.version}")
+        if model is None:
+            print("Model failed to load")
+        if scaler is None:
+            print("Scaler failed to load")
         raise Exception(f"Error loading models: {str(e)}")
-
-# Load models on startup
-load_models()
 
 # Configure CORS
 app.add_middleware(
@@ -153,8 +152,13 @@ async def health_check():
     return {
         "status": "healthy",
         "model_status": model_status,
-        "scaler_status": scaler_status
+        "scaler_status": scaler_status,
+        "current_directory": os.getcwd(),
+        "directory_contents": os.listdir()
     }
+
+# Load models when the application starts
+load_models()
 
 if __name__ == "__main__":
     import uvicorn
