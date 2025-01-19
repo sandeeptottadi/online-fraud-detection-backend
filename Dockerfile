@@ -1,6 +1,5 @@
 FROM python:3.9-slim
 
-# Create and set working directory
 WORKDIR /app
 
 # Install system dependencies
@@ -9,20 +8,18 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first to leverage Docker cache
+# Copy requirements and install dependencies
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-# Copy the rest of the application
-COPY main.py .
-COPY model.pkl .
-COPY scaler.pkl .
+# Copy all application files
+COPY . .
 
-# Debug: List files to verify
-RUN ls -la /app
+# Debug: List directory contents
+RUN echo "Contents of /app:" && ls -la
 
 # Set environment variables
 ENV PORT=8000
 
-# Run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Start the application with the correct module path
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
