@@ -1,4 +1,4 @@
-FROM python:3.9-slim
+FROM python:3.9.21-slim
 
 WORKDIR /app
 
@@ -8,18 +8,20 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install dependencies
+# Copy requirements first
 COPY requirements.txt .
+
+# Install Python packages with exact versions
 RUN pip install -r requirements.txt
 
-# Copy all application files
+# Copy application files
 COPY . .
 
-# Debug: List directory contents
-RUN echo "Contents of /app:" && ls -la
+# Verify files
+RUN ls -la && python -c "import pickle; import sklearn; print(f'Python version: {pickle.format_version}')"
 
 # Set environment variables
 ENV PORT=8000
 
-# Start the application with the correct module path
+# Run the application
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

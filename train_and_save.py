@@ -1,10 +1,9 @@
-import pandas as pd
+import pickle
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
-import pickle
+import pandas as pd
 import os
-import sys
 
 # Type mapping
 TYPE_MAPPING = {
@@ -50,36 +49,10 @@ def generate_transaction():
         'isFraud': is_fraud
     }
 
-def save_model_and_scaler(model, scaler, model_path, scaler_path):
-    try:
-        # Save with protocol=4 for better compatibility
-        with open(model_path, 'wb') as f:
-            pickle.dump(model, f, protocol=4)
-        print(f"Model saved successfully to {model_path}")
-        
-        with open(scaler_path, 'wb') as f:
-            pickle.dump(scaler, f, protocol=4)
-        print(f"Scaler saved successfully to {scaler_path}")
-        
-        # Verify the files can be loaded
-        with open(model_path, 'rb') as f:
-            test_model = pickle.load(f)
-        with open(scaler_path, 'rb') as f:
-            test_scaler = pickle.load(f)
-        print("Verified: Model and scaler can be loaded successfully")
-        
-    except Exception as e:
-        print(f"Error saving model or scaler: {str(e)}")
-        sys.exit(1)
-
 def main():
-    print(f"Python version: {sys.version}")
-    print(f"NumPy version: {np.__version__}")
-    print(f"scikit-learn version: {pd.__version__}")
-    
     # Generate dataset
     n_samples = 10000
-    print(f"\nGenerating {n_samples} transactions...")
+    print("Generating transactions...")
     transactions = [generate_transaction() for _ in range(n_samples)]
     df = pd.DataFrame(transactions)
     
@@ -91,14 +64,14 @@ def main():
     X['type'] = X['type'].map(TYPE_MAPPING)
     
     # Initialize and fit scaler
-    print("\nFitting StandardScaler...")
+    print("Fitting scaler...")
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
     
     # Train model
-    print("\nTraining RandomForestClassifier...")
+    print("Training model...")
     model = RandomForestClassifier(
-        n_estimators=200,
+        n_estimators=100,
         max_depth=10,
         min_samples_split=5,
         min_samples_leaf=2,
@@ -107,54 +80,24 @@ def main():
     )
     model.fit(X_scaled, y)
     
-    # Save models
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    model_path = os.path.join(current_dir, 'model.pkl')
-    scaler_path = os.path.join(current_dir, 'scaler.pkl')
+    # Save with specific protocol version
+    print("Saving model and scaler...")
+    with open('model.pkl', 'wb') as f:
+        pickle.dump(model, f, protocol=4)
     
-    save_model_and_scaler(model, scaler, model_path, scaler_path)
+    with open('scaler.pkl', 'wb') as f:
+        pickle.dump(scaler, f, protocol=4)
     
-    # Print statistics
-    print("\nModel Training Summary:")
-    print("-" * 50)
-    print(f"Total Transactions: {len(df)}")
-    print(f"Fraudulent Transactions: {sum(df['isFraud'])}")
-    print(f"Legitimate Transactions: {len(df) - sum(df['isFraud'])}")
+    print("Testing saved models...")
+    # Verify the saved models can be loaded
+    with open('model.pkl', 'rb') as f:
+        test_model = pickle.load(f)
+    with open('scaler.pkl', 'rb') as f:
+        test_scaler = pickle.load(f)
     
-    # Test predictions
-    test_cases = [
-        {
-            'step': 1,
-            'type': "PAYMENT",
-            'amount': 50000.00,
-            'oldbalanceOrg': 200000.00,
-            'oldbalanceDest': 100000.00
-        },
-        {
-            'step': 210,
-            'type': "TRANSFER",
-            'amount': 5.00,
-            'oldbalanceOrg': 0.00,
-            'oldbalanceDest': 0.00
-        }
-    ]
-    
-    print("\nTest Predictions:")
-    print("-" * 50)
-    for case in test_cases:
-        input_data = np.array([[
-            case['step'],
-            TYPE_MAPPING[case['type']],
-            case['amount'],
-            case['oldbalanceOrg'],
-            case['oldbalanceDest']
-        ]])
-        input_scaled = scaler.transform(input_data)
-        prediction = model.predict(input_scaled)
-        print(f"\nTransaction:")
-        print(f"Type: {case['type']}")
-        print(f"Amount: ${case['amount']}")
-        print(f"Prediction: {'Fraudulent' if prediction[0] else 'Legitimate'}")
+    print("Model and scaler saved and verified successfully!")
+    print(f"Model file size: {os.path.getsize('model.pkl')} bytes")
+    print(f"Scaler file size: {os.path.getsize('scaler.pkl')} bytes")
 
 if __name__ == "__main__":
     main()
